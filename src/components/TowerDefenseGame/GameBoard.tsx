@@ -15,7 +15,9 @@ interface GameBoardProps {
   logoUrl?: string;
   brandName: string;
   selectedTowerType: number | null;
+  selectedTowerId: string | null;
   onPlaceTower: (x: number, y: number) => void;
+  onMoveTower: (towerId: string, x: number, y: number) => void;
   children: React.ReactNode;
 }
 
@@ -29,7 +31,9 @@ export function GameBoard({
   logoUrl,
   brandName,
   selectedTowerType,
+  selectedTowerId,
   onPlaceTower,
+  onMoveTower,
   children,
 }: GameBoardProps) {
   const pathData = useMemo(() => pathToSvg(path), [path]);
@@ -40,16 +44,24 @@ export function GameBoard({
 
   const handleCellClick = useCallback(
     (col: number, row: number) => {
-      if (selectedTowerType === null) return;
-
       const x = ((col + 0.5) / gridCols) * 100;
       const y = ((row + 0.5) / gridRows) * 100;
 
-      if (!isOnPath({ x, y }, path, 8)) {
+      // Check if position is on path
+      if (isOnPath({ x, y }, path, 8)) return;
+
+      // If a tower is selected, move it
+      if (selectedTowerId) {
+        onMoveTower(selectedTowerId, x, y);
+        return;
+      }
+
+      // If a tower type is selected, place a new tower
+      if (selectedTowerType !== null) {
         onPlaceTower(x, y);
       }
     },
-    [selectedTowerType, path, onPlaceTower, gridCols, gridRows]
+    [selectedTowerType, selectedTowerId, path, onPlaceTower, onMoveTower, gridCols, gridRows]
   );
 
   return (
@@ -172,8 +184,8 @@ export function GameBoard({
         )}
       </motion.div>
 
-      {/* Placement grid (only visible when placing) */}
-      {selectedTowerType !== null && (
+      {/* Placement grid (visible when placing new tower or moving existing tower) */}
+      {(selectedTowerType !== null || selectedTowerId !== null) && (
         <div
           className="placement-grid"
           style={{

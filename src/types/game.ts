@@ -62,6 +62,13 @@ export interface ExplosionEffect {
   color: string;
 }
 
+export interface FloatingText {
+  id: string;
+  position: Position;
+  amount: number;
+  color: string;
+}
+
 export interface GameState {
   status: 'idle' | 'playing' | 'paused' | 'won' | 'lost';
   money: number;
@@ -72,6 +79,7 @@ export interface GameState {
   enemies: Enemy[];
   projectiles: Projectile[];
   explosions: ExplosionEffect[];
+  floatingTexts: FloatingText[];
   selectedTower: string | null;
 }
 

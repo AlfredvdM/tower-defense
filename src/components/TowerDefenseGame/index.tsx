@@ -10,6 +10,7 @@ import { GameBoard } from './GameBoard';
 import { Tower } from './Tower';
 import { Enemy } from './Enemy';
 import { Projectile, Explosion } from './Projectile';
+import { FloatingText } from './FloatingText';
 import { ResourceBar } from '@/components/UI/ResourceBar';
 import { WaveIndicator } from '@/components/UI/WaveIndicator';
 import { TowerMenu } from '@/components/UI/TowerMenu';
@@ -34,11 +35,13 @@ export function TowerDefenseGame({ config = DEFAULT_CONFIG }: TowerDefenseGamePr
     startGame,
     placeTower,
     selectTower,
+    moveTower,
     updateGame,
     pauseGame,
     resumeGame,
     resetGame,
     removeExplosion,
+    removeFloatingText,
     getTowerTarget,
   } = useGameState(config, path);
 
@@ -59,6 +62,14 @@ export function TowerDefenseGame({ config = DEFAULT_CONFIG }: TowerDefenseGamePr
       }
     },
     [selectedTowerType, placeTower]
+  );
+
+  // Handle tower movement
+  const handleMoveTower = useCallback(
+    (towerId: string, x: number, y: number) => {
+      moveTower(towerId, x, y);
+    },
+    [moveTower]
   );
 
   // Get headline based on game status
@@ -111,7 +122,9 @@ export function TowerDefenseGame({ config = DEFAULT_CONFIG }: TowerDefenseGamePr
             logoUrl={config.brand.logoUrl}
             brandName={config.brand.name}
             selectedTowerType={selectedTowerType}
+            selectedTowerId={gameState.selectedTower}
             onPlaceTower={handlePlaceTower}
+            onMoveTower={handleMoveTower}
           >
             {/* Towers */}
             {gameState.towers.map((tower) => (
@@ -167,6 +180,22 @@ export function TowerDefenseGame({ config = DEFAULT_CONFIG }: TowerDefenseGamePr
                   gameWidth={GAME_WIDTH}
                   gameHeight={GAME_HEIGHT}
                   onComplete={() => removeExplosion(explosion.id)}
+                />
+              ))}
+            </AnimatePresence>
+
+            {/* Floating reward text */}
+            <AnimatePresence>
+              {gameState.floatingTexts.map((ft) => (
+                <FloatingText
+                  key={ft.id}
+                  x={ft.position.x}
+                  y={ft.position.y}
+                  amount={ft.amount}
+                  color={ft.color}
+                  gameWidth={GAME_WIDTH}
+                  gameHeight={GAME_HEIGHT}
+                  onComplete={() => removeFloatingText(ft.id)}
                 />
               ))}
             </AnimatePresence>

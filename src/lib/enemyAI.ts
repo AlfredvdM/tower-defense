@@ -15,32 +15,47 @@ export function getWaveConfig(
   wave: number,
   difficulty: 'easy' | 'medium' | 'hard'
 ): WaveConfig {
+  const safeWave = Math.max(1, wave || 1);
+
   const difficultyMultiplier = {
     easy: 0.7,
     medium: 1,
     hard: 1.5,
-  }[difficulty];
+  }[difficulty] ?? 1;
 
-  // Progressive enemy count: 1, 3, 6, 10, 15, 21... (triangular numbers)
-  // Formula: n*(n+1)/2 where n is wave number
-  const baseEnemyCount = Math.floor((wave * (wave + 1)) / 2);
-  const enemyCount = Math.max(1, Math.floor(baseEnemyCount * difficultyMultiplier));
+  // Custom wave progression: 1, 2, 3, 6, 10, 15, 17, 20, 25, 30
+  const waveEnemyCounts: Record<number, number> = {
+    1: 1,
+    2: 2,
+    3: 3,
+    4: 6,
+    5: 10,
+    6: 15,
+    7: 17,
+    8: 20,
+    9: 25,
+    10: 30,
+  };
+  const baseEnemyCount = waveEnemyCounts[safeWave] ?? safeWave * 3;
+  const enemyCount = Math.max(1, Math.floor(baseEnemyCount * difficultyMultiplier)) || 1;
 
-  // Health scales with wave but not too quickly
-  const baseHealth = 40 + wave * 15;
+  // Health scales with wave - gets significantly harder in later waves
+  // Wave 1: 50, Wave 5: 130, Wave 10: 280
+  const baseHealth = 30 + safeWave * 20 + Math.floor(safeWave * safeWave * 0.5);
 
-  // Speed increases gradually
-  const baseSpeed = 0.12 + wave * 0.015;
+  // Speed increases gradually - enemies get faster each wave
+  // Wave 1: 0.14, Wave 5: 0.22, Wave 10: 0.32
+  const baseSpeed = 0.12 + safeWave * 0.02;
 
   // Spawn delay decreases as waves progress (more frequent spawns)
   // Starts at 1200ms, decreases to minimum 300ms
-  const spawnDelay = Math.max(300, 1200 - wave * 80);
+  const spawnDelay = Math.max(300, 1200 - safeWave * 80) || 300;
 
   return {
     enemyCount,
-    enemyHealth: Math.floor(baseHealth * difficultyMultiplier),
-    enemySpeed: baseSpeed * difficultyMultiplier,
-    enemyReward: Math.floor(15 + wave * 8),
+    enemyHealth: Math.floor(baseHealth * difficultyMultiplier) || 55,
+    enemySpeed: baseSpeed * difficultyMultiplier || 0.12,
+    enemyReward: Math.floor(15 + safeWave * 8) || 23,
     spawnDelay,
   };
 }
@@ -54,19 +69,24 @@ export function createEnemy(
   path: PathPoint[]
 ): Enemy {
   const config = getWaveConfig(wave, difficulty);
-  const startPos = getPositionOnPath(path, 0);
+  const defaultPos = { x: 0, y: 30 };
+  const startPos = path.length > 0 ? getPositionOnPath(path, 0) : defaultPos;
 
   // Get enemy type for variety
   const enemyType = getEnemyType(wave, enemyIndex);
 
+  const health = Math.max(1, Math.floor(config.enemyHealth * enemyType.healthMultiplier));
+  const speed = Math.max(0.05, config.enemySpeed * enemyType.speed);
+  const reward = Math.max(10, Math.floor(config.enemyReward * enemyType.healthMultiplier));
+
   return {
     id,
-    position: { ...startPos },
-    health: Math.floor(config.enemyHealth * enemyType.healthMultiplier),
-    maxHealth: Math.floor(config.enemyHealth * enemyType.healthMultiplier),
-    speed: config.enemySpeed * enemyType.speed,
+    position: { x: startPos.x ?? defaultPos.x, y: startPos.y ?? defaultPos.y },
+    health,
+    maxHealth: health,
+    speed,
     pathIndex: 0,
-    reward: Math.floor(config.enemyReward * enemyType.healthMultiplier),
+    reward,
   };
 }
 
