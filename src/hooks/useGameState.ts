@@ -204,6 +204,8 @@ export function useGameState(config: TowerDefenseConfig, path: PathPoint[]) {
           newWaveCountdown = 0;
           lastSpawnTime.current = currentTime - currentWaveConfig.spawnDelay - 100;
           newEnemiesSpawnedThisWave = 0;
+          // Ensure totalEnemiesThisWave is correct for the current wave
+          newTotalEnemiesThisWave = currentWaveConfig.enemyCount;
         }
       }
 
