@@ -14,8 +14,11 @@ export function Enemy({ enemy, gameWidth, gameHeight }: EnemyProps) {
   const y = (enemy.position.y / 100) * gameHeight;
   const healthPercent = (enemy.health / enemy.maxHealth) * 100;
 
-  // Determine enemy size based on health
-  const size = enemy.maxHealth > 100 ? 36 : enemy.maxHealth > 60 ? 28 : 24;
+  // Use enemy color from type, fallback to red
+  const enemyColor = enemy.color || '#ef4444';
+
+  // Determine enemy size based on health (larger enemies for higher health)
+  const size = enemy.maxHealth > 200 ? 42 : enemy.maxHealth > 100 ? 36 : enemy.maxHealth > 60 ? 28 : 24;
 
   return (
     <motion.div
@@ -54,9 +57,9 @@ export function Enemy({ enemy, gameWidth, gameHeight }: EnemyProps) {
         style={{
           width: size,
           height: size,
-          background: `radial-gradient(circle at 30% 30%, #ff6b6b, #c92a2a)`,
+          background: `radial-gradient(circle at 30% 30%, ${enemyColor}dd, ${enemyColor})`,
           boxShadow: `
-            0 0 20px rgba(255, 107, 107, 0.5),
+            0 0 20px ${enemyColor}80,
             inset 0 -3px 6px rgba(0,0,0,0.3),
             inset 0 3px 6px rgba(255,255,255,0.2)
           `,

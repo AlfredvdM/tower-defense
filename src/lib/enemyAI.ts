@@ -7,6 +7,7 @@ export interface WaveConfig {
   enemySpeed: number;
   enemyReward: number;
   spawnDelay: number;
+  batchSize: number;
 }
 
 // Get wave configuration based on wave number and difficulty
@@ -23,20 +24,16 @@ export function getWaveConfig(
     hard: 1.5,
   }[difficulty] ?? 1;
 
-  // Custom wave progression: 1, 2, 3, 6, 10, 15, 17, 20, 25, 30
+  // Wave-specific enemy counts for later waves
   const waveEnemyCounts: Record<number, number> = {
-    1: 1,
-    2: 2,
-    3: 3,
-    4: 6,
-    5: 10,
-    6: 15,
-    7: 17,
-    8: 20,
-    9: 25,
-    10: 30,
+    7: 10,
+    8: 12,
+    9: 15,
+    10: 20,
   };
-  const baseEnemyCount = waveEnemyCounts[safeWave] ?? safeWave * 3;
+
+  // Use specific count for waves 7-10, otherwise linear progression
+  const baseEnemyCount = waveEnemyCounts[safeWave] ?? safeWave;
   const enemyCount = Math.max(1, Math.floor(baseEnemyCount * difficultyMultiplier)) || 1;
 
   // Health scales with wave - gets significantly harder in later waves
@@ -48,16 +45,30 @@ export function getWaveConfig(
   const baseSpeed = 0.12 + safeWave * 0.02;
 
   // Spawn delay decreases as waves progress (more frequent spawns)
-  // Starts at 1200ms, decreases to minimum 300ms
-  const spawnDelay = Math.max(300, 1200 - safeWave * 80) || 300;
+  // Starts at 800ms, decreases to minimum 200ms
+  const spawnDelay = Math.max(200, 800 - safeWave * 50);
 
-  return {
-    enemyCount,
-    enemyHealth: Math.floor(baseHealth * difficultyMultiplier) || 55,
-    enemySpeed: baseSpeed * difficultyMultiplier || 0.12,
-    enemyReward: Math.floor(15 + safeWave * 8) || 23,
-    spawnDelay,
+  // Batch size increases with wave (more enemies spawn at once)
+  // Wave 1-2: 1, Wave 3-5: 2, Wave 6-8: 3, Wave 9+: 4
+  const batchSize = Math.min(4, 1 + Math.floor(safeWave / 3));
+
+  const enemyHealth = Math.floor(baseHealth * difficultyMultiplier) || 55;
+  const enemySpeed = baseSpeed * difficultyMultiplier || 0.12;
+  const enemyReward = Math.floor(15 + safeWave * 8) || 23;
+
+  // Validate all values are positive numbers
+  const validatedConfig = {
+    enemyCount: Number.isFinite(enemyCount) && enemyCount > 0 ? enemyCount : safeWave,
+    enemyHealth: Number.isFinite(enemyHealth) && enemyHealth > 0 ? enemyHealth : 50,
+    enemySpeed: Number.isFinite(enemySpeed) && enemySpeed > 0 ? enemySpeed : 0.15,
+    enemyReward: Number.isFinite(enemyReward) && enemyReward > 0 ? enemyReward : 20,
+    spawnDelay: Number.isFinite(spawnDelay) && spawnDelay > 0 ? spawnDelay : 500,
+    batchSize: Math.max(1, batchSize),
   };
+
+  console.log('[WAVE CONFIG]', safeWave, validatedConfig);
+
+  return validatedConfig;
 }
 
 // Create a new enemy for a wave with variety
@@ -87,6 +98,8 @@ export function createEnemy(
     speed,
     pathIndex: 0,
     reward,
+    enemyType: enemyType.name,
+    color: enemyType.color,
   };
 }
 
@@ -134,11 +147,14 @@ export function getEnemyType(wave: number, index: number): {
   color: string;
 } {
   const types = [
-    { size: 1, speed: 1, healthMultiplier: 1, name: 'Scout', color: '#ef4444' },
-    { size: 1.15, speed: 0.85, healthMultiplier: 1.4, name: 'Soldier', color: '#f97316' },
-    { size: 0.85, speed: 1.3, healthMultiplier: 0.75, name: 'Runner', color: '#eab308' },
-    { size: 1.3, speed: 0.7, healthMultiplier: 2, name: 'Heavy', color: '#dc2626' },
-    { size: 1.6, speed: 0.5, healthMultiplier: 4, name: 'Boss', color: '#7c2d12' },
+    { size: 1, speed: 1, healthMultiplier: 1, name: 'scout', color: '#ef4444' },        // Red - basic
+    { size: 1.15, speed: 0.85, healthMultiplier: 1.4, name: 'soldier', color: '#f97316' }, // Orange
+    { size: 0.85, speed: 1.3, healthMultiplier: 0.75, name: 'runner', color: '#eab308' },  // Yellow - fast
+    { size: 1.3, speed: 0.7, healthMultiplier: 2, name: 'heavy', color: '#dc2626' },       // Dark red
+    { size: 1.6, speed: 0.5, healthMultiplier: 4, name: 'boss', color: '#7c2d12' },        // Brown - boss
+    { size: 1.5, speed: 0.4, healthMultiplier: 3, name: 'tank', color: '#1e40af' },        // Blue - slow tank
+    { size: 0.7, speed: 1.5, healthMultiplier: 0.5, name: 'swarm', color: '#ec4899' },     // Pink - fast swarm
+    { size: 1.4, speed: 0.9, healthMultiplier: 2.5, name: 'elite', color: '#7c3aed' },     // Purple - elite
   ];
 
   // Every 5th wave starts with a boss
@@ -146,12 +162,27 @@ export function getEnemyType(wave: number, index: number): {
     return types[4]; // Boss
   }
 
-  // Wave 3+ introduces Heavies
-  if (wave >= 3 && index % 5 === 0) {
+  // Wave 7+ introduces Elites (every 8th enemy)
+  if (wave >= 7 && index > 0 && index % 8 === 0) {
+    return types[7]; // Elite
+  }
+
+  // Wave 5+ introduces Tanks (every 7th enemy)
+  if (wave >= 5 && index > 0 && index % 7 === 0) {
+    return types[5]; // Tank
+  }
+
+  // Wave 4+ introduces Swarm enemies (every 3rd enemy in groups)
+  if (wave >= 4 && index % 3 === 2) {
+    return types[6]; // Swarm
+  }
+
+  // Wave 3+ introduces Heavies (every 5th enemy)
+  if (wave >= 3 && index > 0 && index % 5 === 0) {
     return types[3]; // Heavy
   }
 
-  // Mix of regular types based on index
+  // Mix of regular types based on index (scout, soldier, runner)
   return types[index % 3];
 }
 

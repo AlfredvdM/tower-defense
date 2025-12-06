@@ -10,6 +10,7 @@ interface WaveIndicatorProps {
   countdown: number;
   isWaveActive: boolean;
   enemyCount?: number;
+  compact?: boolean;
 }
 
 export function WaveIndicator({
@@ -20,8 +21,38 @@ export function WaveIndicator({
   countdown,
   isWaveActive,
   enemyCount = 0,
+  compact,
 }: WaveIndicatorProps) {
   const progress = (currentWave / totalWaves) * 100;
+
+  if (compact) {
+    return (
+      <motion.div
+        initial={{ opacity: 0, y: -20 }}
+        animate={{ opacity: 1, y: 0 }}
+        transition={{ delay: 0.1 }}
+        className="hud-panel px-4 py-2.5 flex items-center gap-3"
+      >
+        <span className="text-sm text-white/50 uppercase tracking-wider font-medium">Wave</span>
+        <span className="text-base font-bold" style={{ color: primaryColor }}>
+          {currentWave}/{totalWaves}
+        </span>
+        {countdown > 0 ? (
+          <motion.span
+            key={countdown}
+            initial={{ scale: 1.2 }}
+            animate={{ scale: 1 }}
+            className="text-lg font-bold"
+            style={{ color: accentColor }}
+          >
+            {countdown}s
+          </motion.span>
+        ) : isWaveActive && enemyCount > 0 ? (
+          <span className="text-sm text-white/50">{enemyCount} left</span>
+        ) : null}
+      </motion.div>
+    );
+  }
 
   return (
     <motion.div

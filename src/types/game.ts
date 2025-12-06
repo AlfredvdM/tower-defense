@@ -34,6 +34,7 @@ export interface Tower {
   cost: number;
   lastFired: number;
   level: number;
+  color: string;
 }
 
 export interface Enemy {
@@ -44,6 +45,8 @@ export interface Enemy {
   speed: number;
   pathIndex: number;
   reward: number;
+  enemyType: string;
+  color: string;
 }
 
 export interface Projectile {
@@ -54,6 +57,9 @@ export interface Projectile {
   speed: number;
   velocityX?: number;
   velocityY?: number;
+  color: string;
+  isBeam?: boolean;
+  sourcePosition?: Position;
 }
 
 export interface ExplosionEffect {

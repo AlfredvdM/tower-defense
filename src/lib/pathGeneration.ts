@@ -1,10 +1,7 @@
 import { PathPoint } from '@/types/game';
 
-// Generate a winding path for enemies to follow
+// Generate a winding path for enemies to follow (desktop - landscape)
 export function generatePath(gridWidth: number, gridHeight: number): PathPoint[] {
-  const cellWidth = 100 / gridWidth;
-  const cellHeight = 100 / gridHeight;
-
   // Create a winding S-curve path
   const path: PathPoint[] = [
     // Start from left edge
@@ -25,25 +22,49 @@ export function generatePath(gridWidth: number, gridHeight: number): PathPoint[]
   return path;
 }
 
-// Generate SVG path data from points
+// Generate a vertical S-curve path for mobile (square aspect ratio)
+export function generateMobilePath(): PathPoint[] {
+  const path: PathPoint[] = [
+    // Start from top
+    { x: 50, y: 0 },
+    { x: 50, y: 10 },
+    { x: 30, y: 20 },
+    { x: 20, y: 30 },
+    { x: 30, y: 40 },
+    { x: 70, y: 50 },
+    { x: 80, y: 60 },
+    { x: 70, y: 70 },
+    { x: 30, y: 80 },
+    { x: 50, y: 90 },
+    // End at bottom (base location)
+    { x: 50, y: 100 },
+  ];
+
+  return path;
+}
+
+// Generate SVG path data from points using Catmull-Rom to Bezier conversion
 export function pathToSvg(points: PathPoint[]): string {
   if (points.length < 2) return '';
 
-  // Use smooth curves between points
   let d = `M ${points[0].x} ${points[0].y}`;
 
   for (let i = 1; i < points.length; i++) {
-    const prev = points[i - 1];
-    const curr = points[i];
-    const next = points[i + 1];
+    // Get surrounding points for tangent calculation
+    const p0 = points[Math.max(0, i - 2)];
+    const p1 = points[i - 1];
+    const p2 = points[i];
+    const p3 = points[Math.min(points.length - 1, i + 1)];
 
-    // Calculate control points for smooth curves
-    const cpx1 = prev.x + (curr.x - prev.x) * 0.5;
-    const cpy1 = prev.y;
-    const cpx2 = prev.x + (curr.x - prev.x) * 0.5;
-    const cpy2 = curr.y;
+    // Catmull-Rom to Bezier control points
+    // Tension of 6 gives smooth but not too loose curves
+    const tension = 6;
+    const cp1x = p1.x + (p2.x - p0.x) / tension;
+    const cp1y = p1.y + (p2.y - p0.y) / tension;
+    const cp2x = p2.x - (p3.x - p1.x) / tension;
+    const cp2y = p2.y - (p3.y - p1.y) / tension;
 
-    d += ` C ${cpx1} ${cpy1}, ${cpx2} ${cpy2}, ${curr.x} ${curr.y}`;
+    d += ` C ${cp1x} ${cp1y}, ${cp2x} ${cp2y}, ${p2.x} ${p2.y}`;
   }
 
   return d;
@@ -76,6 +97,28 @@ export function getPathLength(points: PathPoint[]): number {
     length += Math.sqrt(dx * dx + dy * dy);
   }
   return length;
+}
+
+// Generate an offset path for contour lines (perpendicular offset from original path)
+export function generateOffsetPath(points: PathPoint[], offset: number): PathPoint[] {
+  return points.map((point, i) => {
+    // Get direction vector using adjacent points
+    const prev = points[Math.max(0, i - 1)];
+    const next = points[Math.min(points.length - 1, i + 1)];
+
+    const dx = next.x - prev.x;
+    const dy = next.y - prev.y;
+    const length = Math.sqrt(dx * dx + dy * dy) || 1;
+
+    // Perpendicular normal (rotate 90 degrees)
+    const nx = -dy / length;
+    const ny = dx / length;
+
+    return {
+      x: point.x + nx * offset,
+      y: point.y + ny * offset,
+    };
+  });
 }
 
 // Check if a position is on or near the path (for tower placement validation)

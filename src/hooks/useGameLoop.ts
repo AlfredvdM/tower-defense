@@ -9,7 +9,7 @@ interface UseGameLoopOptions {
 }
 
 export function useGameLoop({ onUpdate, fps = 60, paused = false }: UseGameLoopOptions) {
-  const frameRef = useRef<number>();
+  const frameRef = useRef<number | undefined>(undefined);
   const lastTimeRef = useRef<number>(0);
   const intervalMs = 1000 / fps;
 

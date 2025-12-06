@@ -18,6 +18,100 @@ export function Projectile({ projectile, accentColor, primaryColor, gameWidth, g
   // Calculate rotation based on velocity direction
   const angle = Math.atan2(projectile.velocityY || 0, projectile.velocityX || 0) * (180 / Math.PI);
 
+  // Use tower-specific color, fallback to accent color
+  const boltColor = projectile.color || accentColor;
+
+  // Render continuous beam for max level towers
+  if (projectile.isBeam && projectile.sourcePosition) {
+    const sourceX = (projectile.sourcePosition.x / 100) * gameWidth;
+    const sourceY = (projectile.sourcePosition.y / 100) * gameHeight;
+    const targetX = x;
+    const targetY = y;
+
+    // Calculate beam length and angle
+    const dx = targetX - sourceX;
+    const dy = targetY - sourceY;
+    const beamLength = Math.sqrt(dx * dx + dy * dy);
+    const beamAngle = Math.atan2(dy, dx) * (180 / Math.PI);
+
+    return (
+      <motion.div
+        initial={{ opacity: 0 }}
+        animate={{ opacity: 1 }}
+        exit={{ opacity: 0 }}
+        transition={{ duration: 0.05 }}
+        className="absolute pointer-events-none"
+        style={{
+          left: sourceX,
+          top: sourceY,
+          transform: `rotate(${beamAngle}deg)`,
+          transformOrigin: 'left center',
+          zIndex: 25,
+        }}
+      >
+        {/* Continuous beam */}
+        <div
+          className="relative"
+          style={{
+            width: beamLength,
+            height: '8px',
+            marginTop: '-4px',
+          }}
+        >
+          {/* Outer glow */}
+          <div
+            className="absolute inset-0"
+            style={{
+              background: `linear-gradient(90deg, ${boltColor}80 0%, ${boltColor} 10%, ${boltColor} 90%, ${boltColor}80 100%)`,
+              filter: 'blur(4px)',
+              boxShadow: `0 0 20px ${boltColor}, 0 0 40px ${boltColor}80`,
+            }}
+          />
+
+          {/* Core beam */}
+          <div
+            className="absolute"
+            style={{
+              top: '2px',
+              left: 0,
+              right: 0,
+              height: '4px',
+              background: `linear-gradient(90deg, ${boltColor} 0%, #fff 20%, #fff 80%, ${boltColor} 100%)`,
+              boxShadow: `0 0 10px #fff, 0 0 20px ${boltColor}`,
+            }}
+          />
+
+          {/* Inner white core */}
+          <div
+            className="absolute"
+            style={{
+              top: '3px',
+              left: '5%',
+              right: '5%',
+              height: '2px',
+              background: '#fff',
+              boxShadow: '0 0 5px #fff',
+            }}
+          />
+
+          {/* Impact point glow */}
+          <div
+            className="absolute"
+            style={{
+              right: '-10px',
+              top: '-6px',
+              width: '20px',
+              height: '20px',
+              borderRadius: '50%',
+              background: `radial-gradient(circle, #fff 0%, ${boltColor} 40%, transparent 70%)`,
+              boxShadow: `0 0 20px ${boltColor}, 0 0 40px ${boltColor}`,
+            }}
+          />
+        </div>
+      </motion.div>
+    );
+  }
+
   return (
     <motion.div
       initial={{ scale: 0, opacity: 0 }}
@@ -34,39 +128,55 @@ export function Projectile({ projectile, accentColor, primaryColor, gameWidth, g
     >
       {/* Main laser bolt - Star Wars style */}
       <div
-        className="relative"
+        className="relative laser-bolt"
         style={{
-          width: '24px',
-          height: '6px',
+          width: '55px',
+          height: '4px',
         }}
       >
         {/* Core - bright white/yellow center */}
         <div
-          className="absolute inset-0 rounded-full"
+          className="absolute inset-0"
           style={{
+            borderRadius: '2px',
             background: `linear-gradient(90deg,
               transparent 0%,
-              ${accentColor} 20%,
-              #fff 40%,
-              #fff 60%,
-              ${accentColor} 80%,
+              ${boltColor} 10%,
+              #fff 30%,
+              #fff 70%,
+              ${boltColor} 90%,
               transparent 100%
             )`,
             boxShadow: `
               0 0 4px #fff,
-              0 0 8px ${accentColor},
-              0 0 16px ${accentColor},
-              0 0 32px ${accentColor}80
+              0 0 8px ${boltColor},
+              0 0 16px ${boltColor},
+              0 0 32px ${boltColor}80,
+              0 0 48px ${boltColor}40
             `,
           }}
         />
 
-        {/* Outer glow */}
+        {/* Inner white core (narrower) */}
         <div
-          className="absolute -inset-1 rounded-full opacity-60"
+          className="absolute"
           style={{
-            background: `radial-gradient(ellipse, ${accentColor}80 0%, transparent 70%)`,
-            filter: 'blur(2px)',
+            top: '1px',
+            left: '20%',
+            right: '20%',
+            height: '2px',
+            borderRadius: '1px',
+            background: 'linear-gradient(90deg, transparent 0%, #fff 20%, #fff 80%, transparent 100%)',
+            boxShadow: '0 0 3px #fff',
+          }}
+        />
+
+        {/* Outer glow bloom */}
+        <div
+          className="absolute -inset-2 rounded-full opacity-50"
+          style={{
+            background: `radial-gradient(ellipse 100% 200%, ${boltColor}60 0%, transparent 60%)`,
+            filter: 'blur(3px)',
           }}
         />
 
@@ -74,9 +184,10 @@ export function Projectile({ projectile, accentColor, primaryColor, gameWidth, g
         <div
           className="absolute top-1/2 right-full -translate-y-1/2"
           style={{
-            width: '30px',
-            height: '4px',
-            background: `linear-gradient(90deg, transparent 0%, ${accentColor}40 50%, ${accentColor} 100%)`,
+            width: '40px',
+            height: '3px',
+            borderRadius: '1px 0 0 1px',
+            background: `linear-gradient(90deg, transparent 0%, ${boltColor}30 40%, ${boltColor}80 100%)`,
             filter: 'blur(1px)',
           }}
         />

@@ -9,6 +9,14 @@ export interface TowerType {
   projectileSpeed: number;
 }
 
+// Unique projectile colors for each tower type (Star Wars style)
+const TOWER_COLORS = [
+  '#ef4444', // Red - classic blaster
+  '#22c55e', // Green - like a lightsaber
+  '#3b82f6', // Blue - ion cannon
+  '#f59e0b', // Orange/yellow - like Mandalorian blasters
+];
+
 // Generate tower stats based on product name and index
 // Towers are more powerful with varied specializations
 export function generateTowerStats(
@@ -60,7 +68,7 @@ export function generateTowerStats(
     damage: 35 + variation.damageBonus,        // Much higher base damage
     fireRate: 600 - variation.fireRateBonus,   // Faster base fire rate (lower = faster)
     cost: 80 + variation.costBonus,            // Slightly cheaper to start
-    color: accentColor,
+    color: TOWER_COLORS[index % TOWER_COLORS.length],
     description: variation.desc,
     projectileSpeed: variation.projectileSpeed,
   };

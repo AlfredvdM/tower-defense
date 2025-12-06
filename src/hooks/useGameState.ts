@@ -11,7 +11,7 @@ import {
   TowerDefenseConfig,
   PathPoint,
 } from '@/types/game';
-import { generateTowerStats } from '@/lib/towerStats';
+import { generateTowerStats, getUpgradeCost, getUpgradedStats } from '@/lib/towerStats';
 import { createEnemy, updateEnemyPosition, getWaveConfig, isInRange } from '@/lib/enemyAI';
 import { isOnPath } from '@/lib/pathGeneration';
 
@@ -19,7 +19,7 @@ const INITIAL_LIVES = 20;
 const GAME_WIDTH = 800;
 const GAME_HEIGHT = 500;
 const WAVE_COUNTDOWN_MS = 3000; // 3 second countdown between waves
-const FIRST_WAVE_COUNTDOWN_MS = 1500; // Shorter countdown for first wave
+const FIRST_WAVE_COUNTDOWN_MS = 15000; // 15 seconds for first wave to familiarize
 
 export interface ExtendedGameState extends GameState {
   waveCountdown: number; // Seconds until next wave starts
@@ -93,7 +93,7 @@ export function useGameState(config: TowerDefenseConfig, path: PathPoint[]) {
     );
 
     // Check if position is on path
-    if (isOnPath({ x, y }, path, 10)) {
+    if (isOnPath({ x, y }, path, 8)) {
       return false;
     }
 
@@ -116,6 +116,7 @@ export function useGameState(config: TowerDefenseConfig, path: PathPoint[]) {
         cost: towerType.cost,
         lastFired: 0,
         level: 1,
+        color: towerType.color,
       };
 
       return {
@@ -132,9 +133,44 @@ export function useGameState(config: TowerDefenseConfig, path: PathPoint[]) {
     setGameState((prev) => ({ ...prev, selectedTower: towerId }));
   }, []);
 
+  const upgradeTower = useCallback((towerId: string) => {
+    setGameState((prev) => {
+      const tower = prev.towers.find(t => t.id === towerId);
+      if (!tower) return prev;
+
+      const upgradeCost = getUpgradeCost(tower.cost, tower.level);
+      if (prev.money < upgradeCost) return prev;
+
+      // Get tower type index from name to get proper upgraded stats
+      const towerTypeIndex = config.copy.gameElements.indexOf(tower.name);
+      const baseTowerType = generateTowerStats(
+        tower.name,
+        towerTypeIndex >= 0 ? towerTypeIndex : 0,
+        tower.color
+      );
+      const upgradedStats = getUpgradedStats(baseTowerType, tower.level + 1);
+
+      return {
+        ...prev,
+        money: prev.money - upgradeCost,
+        towers: prev.towers.map(t =>
+          t.id === towerId
+            ? {
+                ...t,
+                level: t.level + 1,
+                damage: upgradedStats.damage,
+                range: upgradedStats.range,
+                fireRate: upgradedStats.fireRate,
+              }
+            : t
+        ),
+      };
+    });
+  }, [config]);
+
   const moveTower = useCallback((towerId: string, x: number, y: number) => {
     // Check if position is on path
-    if (isOnPath({ x, y }, path, 10)) {
+    if (isOnPath({ x, y }, path, 8)) {
       return false;
     }
 
@@ -175,6 +211,15 @@ export function useGameState(config: TowerDefenseConfig, path: PathPoint[]) {
     setGameState((prev) => {
       if (prev.status !== 'playing') return prev;
 
+      console.log('[WAVE STATE]', {
+        wave: prev.wave,
+        isWaveActive: prev.isWaveActive,
+        spawned: prev.enemiesSpawnedThisWave,
+        total: prev.totalEnemiesThisWave,
+        enemiesAlive: prev.enemies.length,
+        countdown: prev.waveCountdown
+      });
+
       // Get current wave config from state values (not refs!)
       const currentWaveConfig = getWaveConfig(prev.wave, config.settings.difficulty);
 
@@ -186,7 +231,7 @@ export function useGameState(config: TowerDefenseConfig, path: PathPoint[]) {
       let newMoney = prev.money;
       let newScore = prev.score;
       let newWave = prev.wave;
-      let newStatus = prev.status;
+      let newStatus: GameState['status'] = prev.status;
       let newWaveCountdown = prev.waveCountdown;
       let newIsWaveActive = prev.isWaveActive;
       let newEnemiesSpawnedThisWave = prev.enemiesSpawnedThisWave;
@@ -202,28 +247,35 @@ export function useGameState(config: TowerDefenseConfig, path: PathPoint[]) {
         if (timeUntilWave <= 0) {
           newIsWaveActive = true;
           newWaveCountdown = 0;
-          lastSpawnTime.current = currentTime - currentWaveConfig.spawnDelay - 100;
+          const waveConfig = getWaveConfig(prev.wave, config.settings.difficulty);
+          newTotalEnemiesThisWave = waveConfig.enemyCount;
+          lastSpawnTime.current = currentTime - waveConfig.spawnDelay - 100;
           newEnemiesSpawnedThisWave = 0;
-          // Ensure totalEnemiesThisWave is correct for the current wave
-          newTotalEnemiesThisWave = currentWaveConfig.enemyCount;
         }
       }
 
-      // Spawn enemies when wave is active
+      // Spawn enemies in batches when wave is active
       if (newIsWaveActive && newEnemiesSpawnedThisWave < newTotalEnemiesThisWave) {
         const timeSinceLastSpawn = currentTime - lastSpawnTime.current;
 
         if (timeSinceLastSpawn >= currentWaveConfig.spawnDelay) {
-          const newEnemy = createEnemy(
-            `enemy-${enemyIdCounter.current++}`,
-            prev.wave,
-            newEnemiesSpawnedThisWave,
-            config.settings.difficulty,
-            path
-          );
-          newEnemies.push(newEnemy);
-          newEnemiesSpawnedThisWave++;
+          // Calculate how many enemies to spawn in this batch
+          const remaining = newTotalEnemiesThisWave - newEnemiesSpawnedThisWave;
+          const toSpawn = Math.min(currentWaveConfig.batchSize, remaining);
+
+          for (let i = 0; i < toSpawn; i++) {
+            const newEnemy = createEnemy(
+              `enemy-${enemyIdCounter.current++}`,
+              prev.wave,
+              newEnemiesSpawnedThisWave + i,
+              config.settings.difficulty,
+              path
+            );
+            newEnemies.push(newEnemy);
+          }
+          newEnemiesSpawnedThisWave += toSpawn;
           lastSpawnTime.current = currentTime;
+          console.log('[ENEMY BATCH SPAWNED]', toSpawn, 'enemies,', newEnemiesSpawnedThisWave, 'of', newTotalEnemiesThisWave);
         }
       }
 
@@ -268,24 +320,63 @@ export function useGameState(config: TowerDefenseConfig, path: PathPoint[]) {
           }
         });
 
-        if (closestEnemy) {
+        if (closestEnemy !== null) {
           tower.lastFired = currentTime;
+          const targetEnemy: Enemy = closestEnemy;
 
           // Calculate initial velocity towards target
-          const dx = closestEnemy.position.x - tower.position.x;
-          const dy = closestEnemy.position.y - tower.position.y;
+          const dx = targetEnemy.position.x - tower.position.x;
+          const dy = targetEnemy.position.y - tower.position.y;
           const distance = Math.sqrt(dx * dx + dy * dy);
           const speed = 4;
 
-          newProjectiles.push({
-            id: `proj-${projectileIdCounter.current++}`,
-            position: { ...tower.position },
-            targetId: closestEnemy.id,
-            damage: tower.damage,
-            speed,
-            velocityX: (dx / distance) * speed,
-            velocityY: (dy / distance) * speed,
-          });
+          // Upgraded towers (level 2+) use continuous beam attack
+          // Beam is rendered from Tower component, damage applied here on fire rate
+          if (tower.level >= 2) {
+            // Beam does instant damage
+            targetEnemy.health -= tower.damage;
+
+            // Small impact effect at target (beam visual is rendered from Tower)
+            newExplosions.push({
+              id: `exp-${explosionIdCounter.current++}`,
+              position: { ...targetEnemy.position },
+              color: tower.color,
+            });
+
+            // Check if enemy died from beam
+            if (targetEnemy.health <= 0) {
+              enemiesToRemove.push(targetEnemy.id);
+              newMoney += targetEnemy.reward;
+              newScore += targetEnemy.reward * 10;
+
+              // Bigger explosion for kill
+              newExplosions.push({
+                id: `exp-${explosionIdCounter.current++}`,
+                position: { ...targetEnemy.position },
+                color: '#ef4444',
+              });
+
+              // Floating text showing reward
+              newFloatingTexts.push({
+                id: `ft-${floatingTextIdCounter.current++}`,
+                position: { ...targetEnemy.position },
+                amount: targetEnemy.reward,
+                color: config.brand.accentColor,
+              });
+            }
+          } else {
+            // Normal projectile for non-max level towers
+            newProjectiles.push({
+              id: `proj-${projectileIdCounter.current++}`,
+              position: { ...tower.position },
+              targetId: targetEnemy.id,
+              damage: tower.damage,
+              speed,
+              velocityX: (dx / distance) * speed,
+              velocityY: (dy / distance) * speed,
+              color: tower.color,
+            });
+          }
         }
       });
 
@@ -393,7 +484,29 @@ export function useGameState(config: TowerDefenseConfig, path: PathPoint[]) {
           // Calculate total enemies for the next wave
           const nextWaveConfig = getWaveConfig(newWave, config.settings.difficulty);
           newTotalEnemiesThisWave = nextWaveConfig.enemyCount;
+          console.log('[WAVE COMPLETE]', prev.wave, '-> starting wave', newWave);
         }
+      }
+
+      // Safety check: if wave is active but no enemies and not all spawned, force a spawn
+      if (
+        newIsWaveActive &&
+        newEnemies.length === 0 &&
+        newEnemiesSpawnedThisWave < newTotalEnemiesThisWave &&
+        newTotalEnemiesThisWave > 0
+      ) {
+        // Force spawn the next enemy immediately
+        const newEnemy = createEnemy(
+          `enemy-${enemyIdCounter.current++}`,
+          prev.wave,
+          newEnemiesSpawnedThisWave,
+          config.settings.difficulty,
+          path
+        );
+        newEnemies.push(newEnemy);
+        newEnemiesSpawnedThisWave++;
+        lastSpawnTime.current = currentTime;
+        console.log('[SAFETY SPAWN]', newEnemiesSpawnedThisWave, 'of', newTotalEnemiesThisWave);
       }
 
       // Check game over
@@ -481,6 +594,7 @@ export function useGameState(config: TowerDefenseConfig, path: PathPoint[]) {
     startGame,
     placeTower,
     selectTower,
+    upgradeTower,
     moveTower,
     updateGame,
     pauseGame,
