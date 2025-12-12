@@ -16,6 +16,7 @@ export interface TowerDefenseConfig {
     startingMoney: number;
     totalWaves: number;
     difficulty: 'easy' | 'medium' | 'hard';
+    showTutorial?: boolean;
   };
 }
 

@@ -112,11 +112,17 @@ export function TowerDefenseGame({ config = DEFAULT_CONFIG }: TowerDefenseGamePr
   // Handle start game - start game first, then show tutorial if not seen
   const handleStartGame = useCallback(() => {
     startGame();
-    const hasSeenTutorial = localStorage.getItem(TUTORIAL_STORAGE_KEY);
-    if (!hasSeenTutorial) {
+    // If config explicitly requests tutorial, always show it (ignoring localStorage)
+    if (config.settings?.showTutorial === true) {
       setTutorialStep(1);
+    } else {
+      // Otherwise check localStorage as before
+      const hasSeenTutorial = localStorage.getItem(TUTORIAL_STORAGE_KEY);
+      if (!hasSeenTutorial) {
+        setTutorialStep(1);
+      }
     }
-  }, [startGame]);
+  }, [startGame, config.settings?.showTutorial]);
 
   // Tutorial handlers
   const handleTutorialNext = useCallback(() => {
